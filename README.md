@@ -12,7 +12,7 @@ It's built on Azure, one phase at a time, while I prepare for the **Microsoft AI
 
 | Phase | What it adds | Azure services | Status |
 |---|---|---|---|
-| 1 | Ask your runbooks (RAG) | Blob Storage, Event Grid, Service Bus, Functions, PostgreSQL + pgvector, Azure OpenAI | 🛠️ In progress |
+| 1 | Ask your runbooks (RAG) | Blob Storage, Event Grid, Service Bus, Functions, PostgreSQL + pgvector, Azure OpenAI | 🛠️ In progress (waiting on Azure support, see journey) |
 | 2 | Alerts come in, a triage goes out to Slack/Teams | Cosmos DB (vectors + change feed), Managed Redis, Service Bus topics | ⏳ Planned |
 | 3 | Run it in containers, plus a web UI | Container Registry + Tasks, Container Apps + KEDA, App Service, AKS | ⏳ Planned |
 | 4 | Production-ready | Key Vault, App Configuration, OpenTelemetry, KQL, "Deploy to Azure" button | ⏳ Planned |
@@ -38,6 +38,8 @@ az deployment group create \
   --template-file infra/main.bicep \
   --parameters pgAdminPassword='<a-strong-password-without-spaces>'
 ```
+
+Got `SkuNotAvailable` for PostgreSQL? Your subscription can't use B1ms in that region. Run the same command again and add `pgLocation=<another-region>` after the password.
 
 **3. Deploy the code**
 

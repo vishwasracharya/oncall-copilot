@@ -4,6 +4,9 @@
 @description('Region. Must support Flex Consumption, PostgreSQL Burstable B1ms and the models below.')
 param location string = resourceGroup().location
 
+@description('Region for PostgreSQL only. Change it if your subscription gets SkuNotAvailable for B1ms.')
+param pgLocation string = location
+
 @description('Short lowercase name used in every resource name.')
 @maxLength(8)
 param prefix string = 'oncall'
@@ -11,6 +14,9 @@ param prefix string = 'oncall'
 @secure()
 @description('PostgreSQL admin password (no spaces or quotes). Moves to Key Vault in Phase 4.')
 param pgAdminPassword string
+
+@description('Set true after the first successful deploy so the OpenAI account is only referenced, never rewritten.')
+param openAiExists bool = false
 
 param chatModel string = 'gpt-5.4-mini'
 param chatModelVersion string = '2026-03-17'
@@ -112,8 +118,8 @@ resource runbookUploaded 'Microsoft.EventGrid/systemTopics/eventSubscriptions@20
 // ---------- PostgreSQL + pgvector: the vector store ----------
 
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
-  name: '${prefix}-pg-${suffix}'
-  location: location
+  name: '${prefix}-pg-${uniqueString(resourceGroup().id, pgLocation)}' // new region = new name (names are tied to a region)
+  location: pgLocation
   tags: tags
   sku: { name: 'Standard_B1ms', tier: 'Burstable' }
   properties: {
@@ -147,22 +153,30 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-0
 
 // ---------- Azure OpenAI: embeddings + chat (keys disabled, identity only) ----------
 
-resource openai 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
-  name: '${prefix}-aoai-${suffix}'
+var openAiName = '${prefix}-aoai-${suffix}'
+
+resource newOpenai 'Microsoft.CognitiveServices/accounts@2024-10-01' = if (!openAiExists) {
+  name: openAiName
   location: location
   tags: tags
   kind: 'OpenAI'
   sku: { name: 'S0' }
   properties: {
-    customSubDomainName: '${prefix}-aoai-${suffix}'
+    customSubDomainName: openAiName
     disableLocalAuth: true
     publicNetworkAccess: 'Enabled'
   }
 }
 
+// Everything below uses this reference, so it works whether the account was just created or already existed.
+resource openai 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+  name: openAiName
+}
+
 resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openai
   name: embeddingModel
+  dependsOn: [newOpenai]
   sku: { name: 'GlobalStandard', capacity: 50 } // capacity = thousands of tokens per minute
   properties: {
     model: { format: 'OpenAI', name: embeddingModel, version: embeddingModelVersion }
