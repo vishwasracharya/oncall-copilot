@@ -7,6 +7,9 @@ param location string = resourceGroup().location
 @description('Region for PostgreSQL only. Change it if your subscription gets SkuNotAvailable for B1ms.')
 param pgLocation string = location
 
+@description('PostgreSQL size. Use Standard_B2s if your subscription gets SkuNotAvailable for B1ms.')
+param pgSku string = 'Standard_B1ms'
+
 @description('Short lowercase name used in every resource name.')
 @maxLength(8)
 param prefix string = 'oncall'
@@ -121,7 +124,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   name: '${prefix}-pg-${uniqueString(resourceGroup().id, pgLocation)}' // new region = new name (names are tied to a region)
   location: pgLocation
   tags: tags
-  sku: { name: 'Standard_B1ms', tier: 'Burstable' }
+  sku: { name: pgSku, tier: 'Burstable' }
   properties: {
     version: '16'
     administratorLogin: 'pgadmin'
@@ -135,7 +138,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
 resource allowVector 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
   parent: postgres
   name: 'azure.extensions' // extensions must be allow-listed before CREATE EXTENSION works
-  properties: { value: 'VECTOR', source: 'user-defined' }
+  properties: { value: 'VECTOR', source: 'user-override' }
 }
 
 resource allowAzureServices 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {
